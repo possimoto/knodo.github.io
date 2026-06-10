@@ -7,6 +7,8 @@ export const NAV_LINKS = [
   { name: 'Blog', path: '/blog' },
   { name: 'Creative Wave Learning', path: '/creative-wave-learning' },
   { name: 'Contact', path: '/contact' },
+  { name: 'Time Dashboard', path: '/time-dashboard' },
+];
 ];
 
 export const ABOUT_CONTENT: Record<string, AboutSection> = {
