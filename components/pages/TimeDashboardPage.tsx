@@ -1,4 +1,3 @@
-$ cat /home/user/knodo.github.io/components/pages/TimeDashboardPage.tsx
 
 import React, { useState } from 'react';
 import {
