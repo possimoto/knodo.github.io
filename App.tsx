@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Routes, Route } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
@@ -9,6 +8,7 @@ import BlogPage from './components/pages/BlogPage';
 import BlogDetailPage from './components/pages/BlogDetailPage';
 import CreativeWaveLearningPage from './components/pages/CreativeWaveLearningPage';
 import ContactPage from './components/pages/ContactPage';
+import TimeDashboardPage from './components/pages/TimeDashboardPage';
 
 const App: React.FC = () => {
   return (
@@ -28,6 +28,7 @@ const App: React.FC = () => {
             <Route path="/blog/:slug" element={<BlogDetailPage />} />
             <Route path="/creative-wave-learning" element={<CreativeWaveLearningPage />} />
             <Route path="/contact" element={<ContactPage />} />
+            <Route path="/time-dashboard" element={<TimeDashboardPage />} />
           </Routes>
         </div>
       </main>
