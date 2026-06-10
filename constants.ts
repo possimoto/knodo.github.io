@@ -9,7 +9,6 @@ export const NAV_LINKS = [
   { name: 'Contact', path: '/contact' },
   { name: 'Time Dashboard', path: '/time-dashboard' },
 ];
-];
 
 export const ABOUT_CONTENT: Record<string, AboutSection> = {
   ceo: {
