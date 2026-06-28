@@ -30,15 +30,18 @@ const toHourLabel = (m: number) => `${Math.floor(m/60)}시`;
 const nowInMin = () => { const d = new Date(); return d.getHours()*60+d.getMinutes(); };
 const todayStr = () => new Date().toISOString().slice(0, 10);
 
-const weeklyData = [
-  { day: '월', work: 180, study: 90,  exercise: 60,  create: 120, rest: 60  },
-  { day: '화', work: 240, study: 120, exercise: 0,   create: 60,  rest: 90  },
-  { day: '수', work: 120, study: 180, exercise: 60,  create: 180, rest: 60  },
-  { day: '목', work: 300, study: 60,  exercise: 60,  create: 0,   rest: 60  },
-  { day: '금', work: 200, study: 90,  exercise: 60,  create: 90,  rest: 60  },
-  { day: '토', work: 60,  study: 120, exercise: 90,  create: 210, rest: 120 },
-  { day: '일', work: 0,   study: 90,  exercise: 60,  create: 90,  rest: 180 },
-];
+const getWeekDates = () => {
+  const today = new Date();
+  const day = today.getDay();
+  const mon = new Date(today);
+  mon.setDate(today.getDate() - (day === 0 ? 6 : day - 1));
+  return Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(mon);
+    d.setDate(mon.getDate() + i);
+    return d.toISOString().slice(0, 10);
+  });
+};
+const DAY_LABELS = ['월','화','수','목','금','토','일'];
 
 const SectionTitle: React.FC<{ children: React.ReactNode }> = ({ children }) => (
   <h2 className="text-lg font-semibold text-gray-200 mb-4">{children}</h2>
@@ -151,7 +154,6 @@ const TimelineBar: React.FC<{ activities: Activity[] }> = ({ activities }) => {
 const CategoryPie: React.FC<{ activities: Activity[] }> = ({ activities }) => {
   const totals: Record<string, number> = {};
   for (const a of activities) {
-    if (a.category === 'rest') continue;
     totals[a.category] = (totals[a.category]??0)+(a.end_min-a.start_min);
   }
   const data = Object.entries(totals).map(([id, min]) => ({ name: nameOf(id), value: min, color: colorOf(id) }));
@@ -190,19 +192,19 @@ const ActivityList: React.FC<{ activities: Activity[]; onDelete: (id: number) =>
   );
 };
 
-const WeeklyBar: React.FC = () => {
+const WeeklyBar: React.FC<{ data: Record<string, number>[] }> = ({ data }) => {
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (!active || !payload?.length) return null;
     return (
       <div className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 space-y-1">
         <p className="font-semibold mb-1">{label}요일</p>
-        {payload.map((p: any) => <p key={p.dataKey} style={{ color: p.fill }}>{nameOf(p.dataKey)}: {Math.floor(p.value/60)}h {p.value%60>0?`${p.value%60}m`:''}</p>)}
+        {payload.map((p: any) => p.value > 0 && <p key={p.dataKey} style={{ color: p.fill }}>{nameOf(p.dataKey)}: {Math.floor(p.value/60)}h {p.value%60>0?`${p.value%60}m`:''}</p>)}
       </div>
     );
   };
   return (
     <ResponsiveContainer width="100%" height={220}>
-      <BarChart data={weeklyData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
+      <BarChart data={data} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
         <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
         <XAxis dataKey="day" tick={{ fill: '#9ca3af', fontSize: 12 }} />
         <YAxis tick={{ fill: '#9ca3af', fontSize: 11 }} tickFormatter={v => `${Math.floor(v/60)}h`} />
@@ -217,6 +219,8 @@ const TimeDashboardPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'today'|'week'>('today');
   const [activities, setActivities] = useState<Activity[]>([]);
   const [loading, setLoading] = useState(true);
+  const [weeklyData, setWeeklyData] = useState<Record<string, number>[]>([]);
+  const [weekLoading, setWeekLoading] = useState(false);
 
   const today = new Date();
   const dateStr = `${today.getFullYear()}년 ${today.getMonth()+1}월 ${today.getDate()}일`;
@@ -235,6 +239,32 @@ const TimeDashboardPage: React.FC = () => {
     };
     fetchActivities();
   }, []);
+
+  useEffect(() => {
+    if (activeTab !== 'week') return;
+    const fetchWeekly = async () => {
+      setWeekLoading(true);
+      const dates = getWeekDates();
+      const { data, error } = await supabase
+        .from('activities')
+        .select('*')
+        .gte('date', dates[0])
+        .lte('date', dates[6]);
+      if (!error && data) {
+        const rows = dates.map((date, i) => {
+          const row: Record<string, number | string> = { day: DAY_LABELS[i] };
+          CATEGORIES.forEach(c => { row[c.id] = 0; });
+          data.filter(a => a.date === date).forEach(a => {
+            row[a.category] = ((row[a.category] as number) || 0) + (a.end_min - a.start_min);
+          });
+          return row as Record<string, number>;
+        });
+        setWeeklyData(rows);
+      }
+      setWeekLoading(false);
+    };
+    fetchWeekly();
+  }, [activeTab]);
 
   const handleAdd = async (a: Omit<Activity, 'id' | 'date'>) => {
     const { data, error } = await supabase
@@ -280,7 +310,6 @@ const TimeDashboardPage: React.FC = () => {
       {activeTab === 'today' ? (
         <>
           <TimerInput activities={activities} onAdd={handleAdd} />
-
           {loading ? (
             <div className="text-center text-gray-500 py-8">불러오는 중...</div>
           ) : (
@@ -299,18 +328,20 @@ const TimeDashboardPage: React.FC = () => {
           )}
         </>
       ) : (
+        weekLoading ? <div className="text-center text-gray-500 py-8">불러오는 중...</div> : (
         <>
-          <Card><SectionTitle>주간 카테고리별 시간</SectionTitle><WeeklyBar /></Card>
+          <Card><SectionTitle>주간 카테고리별 시간</SectionTitle><WeeklyBar data={weeklyData} /></Card>
           <Card>
             <SectionTitle>이번 주 카테고리 합계</SectionTitle>
             <div className="space-y-3">
               {CATEGORIES.map(c => {
-                const total = weeklyData.reduce((sum,d) => sum+(d as any)[c.id], 0);
+                const total = weeklyData.reduce((sum,d) => sum+((d[c.id] as number)||0), 0);
+                const maxTotal = 7 * 8 * 60;
                 return (
                   <div key={c.id} className="flex items-center gap-3">
                     <span className="text-sm text-gray-300 w-12">{c.name}</span>
                     <div className="flex-1 bg-gray-700 rounded-full h-2.5 overflow-hidden">
-                      <div className="h-full rounded-full transition-all" style={{ width: `${(total/(7*300))*100}%`, backgroundColor: c.color }} />
+                      <div className="h-full rounded-full transition-all" style={{ width: `${Math.min((total/maxTotal)*100,100)}%`, backgroundColor: c.color }} />
                     </div>
                     <span className="text-sm text-gray-400 w-16 text-right">{Math.floor(total/60)}h {total%60>0?`${total%60}m`:''}</span>
                   </div>
@@ -319,6 +350,7 @@ const TimeDashboardPage: React.FC = () => {
             </div>
           </Card>
         </>
+        )
       )}
     </div>
   );
